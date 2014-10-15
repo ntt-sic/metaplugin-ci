@@ -1,0 +1,5 @@
+#!/bin/sh -e
+
+bash /opt/metaplugin-ci/files/jenkins-slave.sh online
+
+exit 0

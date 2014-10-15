@@ -8,7 +8,7 @@ set -ex
 ### asume ci-test top
 THIS_DIR=`pwd`
 
-DATA_PATH=$THIS_DIR/metaplugin-ci/data
+DATA_PATH=$THIS_DIR/data
 PUPPET_MODULE_PATH="--modulepath=$THIS_DIR/metaplugin-ci/modules:$THIS_DIR/config/modules:/etc/puppet/modules"
 
 ### manually git clone openstack-infra/config to THIS_DIR

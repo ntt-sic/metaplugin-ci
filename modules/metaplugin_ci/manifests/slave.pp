@@ -32,6 +32,14 @@ class metaplugin_ci::slave (
     target => "$this_dir/metaplugin-ci",
   }
 
+  file { '/etc/rc.local':
+    ensure => present,
+    source => 'puppet:///modules/metaplugin_ci/etc/rc.local',
+    owner  => 'root',
+    group  => 'root',
+    mode   => '0755',
+  }
+
 ###  include devstack_host
 ### devstack_host duplicate slave_common. followings are copied from devsack_host
 ###
