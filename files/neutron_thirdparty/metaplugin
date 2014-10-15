@@ -1,0 +1,71 @@
+# Metaplugin
+# ----------
+
+METAPLUGIN_CONF_PATH=etc/neutron/plugins/metaplugin
+METAPLUGIN_CONF_FILENAME=metaplugin.ini
+METAPLUGIN_CLASS=neutron.plugins.metaplugin.meta_neutron_plugin.MetaPluginV2
+META_INTERFACE_DRIVER=neutron.agent.linux.interface.MetaInterfaceDriver
+
+# Save trace setting
+METAPLUGIN3_XTRACE=$(set +o | grep xtrace)
+set +o xtrace
+
+function _setup_meta_interface_driver {
+    TARGET_CONF=$1
+
+    # add parameters for keystone
+    iniset $TARGET_CONF DEFAULT auth_url $KEYSTONE_SERVICE_URI/v2.0
+    iniset $TARGET_CONF DEFAULT admin_tenant_name $SERVICE_TENANT_NAME
+    iniset $TARGET_CONF DEFAULT admin_user $Q_ADMIN_USERNAME
+    iniset $TARGET_CONF DEFAULT admin_password $SERVICE_PASSWORD
+
+    # change interface_driver and set meta_flavor_driver_mappings
+    ORIGINAL_INTERFACE_DRIVER=$(iniget $TARGET_CONF DEFAULT interface_driver)
+    iniset $TARGET_CONF DEFAULT interface_driver $META_INTERFACE_DRIVER
+    iniset $TARGET_CONF DEFAULT meta_flavor_driver_mappings ml2:$ORIGINAL_INTERFACE_DRIVER
+}
+
+function configure_metaplugin {
+    # Replace core_plugin
+    iniset $NEUTRON_CONF DEFAULT core_plugin $METAPLUGIN_CLASS
+
+    # Create metaplugin.ini
+    mkdir -p /$METAPLUGIN_CONF_PATH
+    METAPLUGIN_CONF_FILE=$METAPLUGIN_CONF_PATH/$METAPLUGIN_CONF_FILENAME
+    cp $NEUTRON_DIR/$METAPLUGIN_CONF_FILE /$METAPLUGIN_CONF_FILE
+    iniset /$METAPLUGIN_CONF_FILE meta plugin_list ml2:$Q_PLUGIN_CLASS
+    iniset /$METAPLUGIN_CONF_FILE meta l3_plugin_list
+    iniset /$METAPLUGIN_CONF_FILE meta default_flavor ml2
+    iniset /$METAPLUGIN_CONF_FILE meta default_l3_flavor
+    iniset /$METAPLUGIN_CONF_FILE meta rpc_flavor ml2
+    iniset /$METAPLUGIN_CONF_FILE meta supported_extension_aliases 'provider,binding,external-net,quotas,security-group,agent,dhcp_agent_scheduler,multi-provider,allowed-address-pairs,extra_dhcp_opt'
+
+    Q_PLUGIN_EXTRA_CONF_FILES=("${Q_PLUGIN_EXTRA_CONF_FILES[@]}" "$METAPLUGIN_CONF_FILE")
+
+    # Modify configuration file of agents
+    _setup_meta_interface_driver $Q_DHCP_CONF_FILE
+    _setup_meta_interface_driver $Q_L3_CONF_FILE
+}
+
+function init_metaplugin {
+    :
+}
+
+function install_metaplugin {
+    :
+}
+
+function start_metaplugin {
+    :
+}
+
+function stop_metaplugin {
+    :
+}
+
+function check_metaplugin {
+    :
+}
+
+# Restore xtrace
+$METAPLUGIN3_XTRACE

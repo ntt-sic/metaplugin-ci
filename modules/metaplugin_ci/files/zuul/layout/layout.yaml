@@ -1,0 +1,21 @@
+pipelines:
+  - name: check
+    failure-message: Build failed. Leave a comment with 'recheck-metaplugin' to rerun a check. ('recheck' will be ignored.)
+    manager: IndependentPipelineManager
+    trigger:
+      gerrit:
+        - event: patchset-created
+        - event: change-restored
+        - event: comment-added
+          comment: (?i)^(Patch Set [0-9]+:)?( [\w\\+-]*)*(\n\n)?\s*recheck-metaplugin\s*$
+    success:
+      gerrit:
+        verified: 1
+    failure:
+      gerrit:
+        verified: 0
+
+projects:
+  - name: openstack-dev/sandbox
+    check:
+      - check-tempest-dsvm-metaplugin
