@@ -11,10 +11,8 @@ class metaplugin_ci::master (
   $ssl_chain_file_contents = '',
   $jenkins_ssh_private_key = '',
   $jenkins_ssh_public_key = '',
-  $publish_host = 'localhost',
-  $url_pattern = 'http://localhost/{change.number}/{change.patchset}/{pipeline.name}/{job.name}/{build.number}',
-  $log_root_url= "$publish_host/logs",
-  $static_root_url= "$publish_host/static",
+  $log_server = 'localhost',
+  $log_url_base = "http://$log_server/metaplugin-ci",
   $upstream_gerrit_server = 'review.openstack.org',
   $gearman_server = '127.0.0.1',
   $upstream_gerrit_user = '',
@@ -143,6 +141,10 @@ class metaplugin_ci::master (
   jenkins::plugin { 'rebuild':
     version => '1.14',
   }
+  ### not released yet. but use 1.9 function. install manually.
+  #jenkins::plugin { 'scp':
+  #  version => '1.9',
+  #}
   jenkins::plugin { 'simple-theme-plugin':
     version => '0.2',
   }
@@ -205,10 +207,10 @@ class metaplugin_ci::master (
     gerrit_server        => $upstream_gerrit_server,
     gerrit_user          => $upstream_gerrit_user,
     zuul_ssh_private_key => $upstream_gerrit_ssh_private_key,
-    url_pattern          => $url_pattern,
+    url_pattern          => "$log_url_base/{build.parameters[LOG_PATH]}",
     zuul_url             => $zuul_url,
     job_name_in_report   => true,
-    status_url           => "http://$publish_host/zuul/status",
+    status_url           => "http://localhost/zuul/status",
     git_email            => $git_email,
     git_name             => $git_name
   }

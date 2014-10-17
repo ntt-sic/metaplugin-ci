@@ -5,7 +5,7 @@
 
     wrappers:
       - timeout:
-          timeout: 185  # Timeout in *minutes*
+          timeout: 60  # Timeout in *minutes*
           fail: true  # A job run that exceeds the timeout will cause a failure
       - timestamps
 
@@ -13,6 +13,9 @@
       - shell: |
           #!/bin/bash -x
           ### TODO: log cleanup
+          sudo rm -rf /opt/stack/logs
+          sudo rm -rf /opt/stack/new
+
           sudo ovs-vsctl --if-exists del-br br-int
           sudo ovs-vsctl --if-exists del-br br-ex
           sudo ovs-vsctl --if-exists del-br br-tun
@@ -27,7 +30,6 @@
           export DEVSTACK_GATE_NEUTRON=1
           export DEVSTACK_GATE_TEMPEST=1
           export ENABLED_SERVICES=metaplugin
-          export SKIP_DEVSTACK_GATE_PROJECT=1
           export DEVSTACK_GATE_FEATURE_MATRIX='/opt/metaplugin-ci/files/features.yaml'
           export DEVSTACK_GATE_TEMPEST_REGEX='tempest.api.network'
 
@@ -36,20 +38,20 @@
           }
           export -f pre_test_hook
 
-          function gate_hook {
-              remaining_time
-              timeout -s 9 ${REMAINING_TIME}m /opt/devstack-gate/devstack-vm-gate.sh
-          }
-          export -f gate_hook
+          #function gate_hook {
+          #    remaining_time
+          #    timeout -s 9 ${REMAINING_TIME}m /opt/devstack-gate/devstack-vm-gate.sh
+          #}
+          #export -f gate_hook
 
           cp devstack-gate/devstack-vm-gate-wrap.sh ./safe-devstack-vm-gate-wrap.sh
           ./safe-devstack-vm-gate-wrap.sh
-      - link-logs  # In macros.yaml ### necessary ?
+      - link-logs  # In macros.yaml
 
     publishers:
-#      - devstack-logs  # In macros.yaml
-#      - devstack-confs # In macros.yaml
-#      - console-log  # In macros.yaml
+      - devstack-logs  # In macros.yaml
+      #- devstack-confs # In macros.yaml
+      #- console-log  # In macros.yaml
       - post-tasks:
           - matches:
               - log-text: ''
