@@ -172,6 +172,15 @@ class metaplugin_ci::master (
     source  => 'puppet:///modules/metaplugin_ci/ssh_config',
   }
 
+  file { '/var/lib/jenkins/plugins/scp.hpi':
+    ensure  => present,
+    owner   => 'jenkins',
+    group   => 'jenkins',
+    mode    => '0644',
+    require => File['/var/lib/jenkins/plugins'],
+    source  => 'puppet:///modules/metaplugin_ci/scp.hpi',
+  }
+
   if $manage_jenkins_jobs == true {
     ### use original
     class { '::jenkins::job_builder':

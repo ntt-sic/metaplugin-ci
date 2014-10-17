@@ -50,8 +50,7 @@
 
     publishers:
       - devstack-logs  # In macros.yaml
-      #- devstack-confs # In macros.yaml
-      #- console-log  # In macros.yaml
+      - console-log  # In macros.yaml
       - post-tasks:
           - matches:
               - log-text: ''
