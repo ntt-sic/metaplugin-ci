@@ -1,0 +1,341 @@
+Metaplugin CI システム構築 Howto
+
+注: まだ、実際の構築前のメモ。構築後、実際の環境を反映して、修正する。
+
+○ 内容
+
+- 事前準備
+- master 初期構築
+- master 更新
+- slave 初期構築
+- slave 更新
+- log server 構築
+- 実装メモ
+
+○ 事前準備
+
+以下のマシンが必要。
+
+- master
+  jenkinsのmasterノード用。zuul も稼働。1台。
+- slave
+  jenkinsのslaveノード用。実際のテストが実行される。数台。
+- log server
+  実行ログの格納、公開用。1台。(masterとの兼用可)
+
+(以下、log server の構築については、未稿)
+
+・マシンスペック
+  master:
+    メモリ:    2G
+    ディスク: 10G
+
+  slave:
+    メモリ:    4G
+    ディスク: 40G
+
+・OS
+  Ubuntu 14.04
+  (注: puppetのmanifestがubuntu前提で作成されているため、ubuntuでなければならない。
+       現状、14.04 で動作確認。)
+
+・ネットワーク環境
+  - master
+    internatにアクセスできる必要あり。(どこかのgateway経由のSNATで構わない。外部から
+    アクセスできる必要はない。)
+    ただし、jenkins の管理web画面の操作は行う必要があるため、管理者の環境から、master
+    へのアクセスは確保する必要がある。(構築作業等、コンソールからでは不便なので、管理
+    者の環境から、SSHアクセスできる必要がある。)
+  - slave
+    master、log-server との通信ができればよい。
+    (管理者からの操作は、直接できなくとも、master経由で構わない)
+  - log-server
+    ログを公開するため、外部からアクセスできる必要がある。
+    maseter、slave 間の通信も当然必要。
+    (管理者からの操作は、直接できなくとも、master経由で構わない)
+
+・OSインストールと設定
+  - 管理ユーザ
+    ユーザ名は各マシンで統一しておく。(仮に ciuser とする)
+  - インストール時は、SSHサービスを有効にする。
+  - /etc/hosts
+    master、slave、log server が名前解決できるよう、/etc/hostsに記述しておく。
+    --- 例 ---
+    192.168.122.10 master zuul    (<= zuul が必要らしい。詳細未確認)
+    192.168.122.21 slave1
+    192.168.122.22 slave2
+    192.168.122.1  log-server
+    ----------
+    注: 固定IPアドレスを前提。
+  - 管理ユーザは、各マシンに公開鍵でSSHログインできるようにしておく。
+    注: 構築スクリプトを実行すると、公開鍵ログインしかできなくなるため、事前に準備して
+        おく。
+  - SCP用ユーザ
+    slaveからlog-serverにログをSCP転送する際に使用するユーザが必要。管理ユーザ(ciuser)
+    でもOK。
+
+○ master 初期構築
+
+(注: masterの構築を最初に行う必要がある。)
+
+1) 構築用ディレクトリ作成
+   作業用のディレクトリを作成し、以降の作業は、そこをカレントディレクトリとして行う。
+   ---
+   $ pwd
+   /home/ciuser
+   $ mkdir cibuild
+   $ cd cibuild
+   ---
+
+2) metaplugin-ci リポジトリのclone
+   ---
+   $ sudo apt-get install git  (<= 多分必要)
+   ...
+   $ git clone https://github.com/ntt-sic/metaplugin-ci
+   ...
+   ---
+
+3) data ディレクトリとその中身の用意
+   ---
+   $ mkdir data
+   ---
+
+   必要なものは、以下のとおり。
+   - vars.sh         各種環境変数定義
+   - gerrit_key      gerritにアクセスする際のプライベートキー
+   - jenkins_key     master/slave間のアクセス用(プライベートキー)
+   - jenkins_key.pub master/slave間のアクセス用(パブリックキー)
+
+   ・vars.sh
+     ほぼ固定の内容。metaplugin-ci/data-template/vars.sh をコピーし、必要な箇所を
+     編集する。
+     ---
+     $ cp metaplugin-ci/data-template/vars.sh data
+     $ vi data/vars.sh
+     ---
+
+     vars.sh の内容は以下のとおり。(★: 現状は、テスト用のものが入っているが、本番
+     環境構築時には、固定で、編集の必要はなくなる予定。)
+     - UPSTREAM_GERRIT_HOST_PUBLIC_KEY
+       gerritサーバの公開鍵の内容。
+     - GIT_EMAIL
+       gitアカウント用e-mailアドレス
+     - GIT_NAME
+       サーアパーティCI用ユーザ名
+     - UPSTREAM_GERRIT_SERVER
+       gerritサーバ
+     - UPSTREAM_GERRIT_USER
+       Metaplugin CI 用に取得したユーザ名
+     - LOG_URL_BASE
+       ログサーバにログを転送する際のベースURL
+       (ex. http://<ip address>/metaplugin-ci)
+     - LOG_SERVER
+       ログサーバのホスト名(/etc/hosts に書いたホスト名と一致させる)
+     - JENKINS_URL
+       slaveからmasterにアクセスする際のURL。(http://master:8080/ 固定でよい)
+     - ZUUL_URL
+       ?
+
+   ・gerrit_key
+     これは、Metaplugin CI用に取得したプライベートキーをこのファイル名で置く。
+
+   ・jenkins_key、jenkins_key.pub
+     master/slave間のアクセスに使用するキーペアを用意する。なければ、以下のように作成
+     する。ファイル名は、jenkins_key、jenkins_key.pub にする。
+     ---
+     $ cd data
+     $ ssh-keygen -t rsa -b 1024 -N '' -f jenkins_key
+     $ cd ..
+     ---
+
+4) master構築スクリプト実行
+   ---
+   $ sudo bash metaplugin-ci/tools/install_master.sh
+   ...
+   ---
+
+   install_master.sh は、下記を実行する。
+
+   a) openstack-infra/config リポジトリのclone
+      /opt/config に cloneする。
+      openstack-infra/config の manifest、install スクリプトを使用するため。
+   b) puppetのインストール
+      /opt/config/install_puppet.sh の実行。
+      puppet環境のインストール。
+   c) moduleのインストール
+      /opt/config/install_modules.sh の実行。
+   d) apache用certファイル作成
+      (注: 必要性がよく分かっていない)
+   e) Metaplugin CI masterノード構築用manifest適用
+      jenkins、zuul 関連の設定を行う。
+
+   a)～d) は初回のみ実行される。
+   何か変更があるときは、metaplugin/modules/metaplugin_ci の下を修正し、manifestの再適用
+   (eの部分)を行う。このときも、install_master.sh を実行すればよい。
+
+5) サービスの起動
+   ---
+   $ sudo service jenkins restart    (動いてるかもしれないので、restart)
+   $ sudo jenkins-jobs --flush-cache update /etc/jenkins_jobs/config/
+   (jenkinsの初期化がきちんと終わっていないと失敗するので、jenkins の
+    startから少し時間を置く)
+   $ sudo service zuul start
+   $ sudo service zuul-merget start
+   (zuul、zuul-merger がきちんと動いていることを確認する。
+    $ sudo service zuul status
+    $ sudo service zuul-merger status )
+   ---
+
+6) jenkinsの設定
+  jenkinsのWeb画面(http://master:8080/)に接続して、設定を行う。
+
+  a) geaman plugin の有効化
+    [Mangege Jenkins] -> [Configure System]
+    画面をスクロールし、[Gearman Plugin Config]のところ。
+    - [Test Connection] ボタンを押して、接続を確認
+      注: zuul が起動している必要がある。(geaman serverは、zuulが起動する)
+    - [Enable Geaman] チェックボックスにチェックを入れる。
+    - 画面下の[Save]ボタンを押下
+
+  b) credentialの登録
+    [Credentials] -> [Global credentials] -> [Add Credentials]
+    以下のように設定。
+    * Kind: SSH Username with private key
+    * Scope: Global
+    * Username: jenkins
+    * Description: 空でよい
+    * Privatekey: [From a file on Jnekins master] にチェック
+        File: /var/lib/jenkins/.ssh/id_rsa
+    [OK]ボタンを押下
+
+  c) SCPの設定
+    ログサーバへの転送に使用される。
+    [Manage Jenkins] -> [Configure System]
+    画面をスクロールし、[SCP repository hosts]のところ。
+    以下のように設定。
+    * Displayname: vars.sh の LOG_SERVER と一致させる。
+    * Hostname: vars.sh の LOG_SERVER と一致させる。(つまり、DisplaynameとHostnameは同じ)
+    * Port: 22
+    * Root Repository Path: ログサーバ側の格納ディレクトリ。
+      (ex. /var/www/html/metaplugin-ci)
+      (vars.sh の LOG_URL_BASE でアクセスされる場所と一致していること。)
+    * User Name: SCP用ユーザ(ciuserを使用してもよい)
+    * Passward/Passphrase: SCP用ユーザのパスワード
+    * Keyfile: PasswardかKeyfileのどちらかを使用する。Passwardの方が設定が簡単。
+    画面下の[Save]ボタンを押下。
+
+    (注: ログサーバの構築を先にしておかないといけないかも)
+
+補足) zuul status 画面
+  http://master:80/ にアクセスすると、zuul の status 画面が出せる。キューの状況を
+  確認できる。
+  /etc/apache2/apache2.conf <Directory /> のところ、Require all granted にする
+  必要あり。(その意味、未確認)
+
+○ master 更新
+
+  更新が必要な場合は、metaplugin-ci 配下を修正し、install_master.sh を実行する。
+  (github の方に commit しておくこと。)
+  ---
+  $ cd cibuild
+  $ metaplugin-ci/ 配下の修正
+  $ sudo bash metaplugin-ci/tools/install_master.sh
+  ---
+
+  更新の種類により、以下の追加作業を行う。
+
+  ・jenkins の構成に変更がある場合(ex. pluginの追加、更新)
+    ---
+    $ sudo service jenkins restart
+    ---
+    必要であれば、jenkins の管理Web画面で、plugin関連の設定を行う。
+
+  ・jobの定義に変更がある場合(i.e. /etc/jenkins-jobs/config/配下の修正)
+    ---
+    $ sudo jenkins-jobs --flush-cache update /etc/jenkins_jobs/config/
+    ---
+    (jenkinsのrestartは必要ない)
+
+  ・layout.yaml に変更がある場合
+    ---
+    $ sudo service zuul reload
+    ---
+    注: stop/start すると、queueが消えてしまうので、reload する。
+    注: zuul-merger の方は、reload/restartする必要なし。
+
+○ slave 初期構築
+
+1) master構築時に使用した、cibuild/data を使用する。cibuild ごと、master より SCPする。
+   ---
+   $ pwd
+   /home/ciuser
+   $ scp -r master:/home/ciuser/cibuild .
+   ---
+   補足: master/home/ciuser/cibuild を NFS マウントするのでもよい。
+
+2) 構築スクリプト実行
+   ---
+   $ cd cubuild
+   $ sudu bash metaplugin-ci/tools/install_slave.sh
+   ...
+   ---
+
+   install_slave.sh は、下記を実行する。
+
+   a) openstack-infra/config リポジトリのclone
+      /opt/config に cloneする。
+      openstack-infra/config の manifest、install スクリプトを使用するため。
+   b) puppetのインストール
+      /opt/config/install_puppet.sh の実行。
+      puppet環境のインストール。
+   c) moduleのインストール
+      /opt/config/install_modules.sh の実行。
+   d) Metaplugin CI slaveノード構築用manifest適用
+      jenkins slaveとしての設定を行う。
+   e) devstack実行環境準備
+      /opt/git の下に、あらゆるリポジトリをcloneする。
+
+   a)～c)については、master ノードと同様。
+   a)～c)、e) は初回構築時のみ実行される。
+
+   補足: e) がかなり時間かかる。
+
+3) slaveの登録
+  jenkinsの管理Web画面から。
+  [Manage Jenkins] -> [Manage Nodes] -> [New Node]
+  以下のように設定。
+  * Node name: slaveのホスト名(/etc/hostsに書いたもの)
+  * Dumb Slave にチェック。
+  (Copy Existing Node にはチェックしない)
+
+○ slave 更新
+
+  更新が必要な場合は、metaplugin-ci 配下を修正し、install_slave.sh を実行する。
+  (github の方に commit しておくこと。)
+  ---
+  $ cd cibuild
+  $ metaplugin-ci/ 配下の修正
+  $ sudo bash metaplugin-ci/tools/install_slave.sh
+  ---
+
+○ log server 構築
+
+1) 公開用ディレクトリの作成
+  jenkins の SCP設定画面で、[Root Repository Path] に設定するもの。
+  [SCP User] の書き込み権があるようにしておくこと。
+
+2) apache の設定については、未。
+
+  (テスト環境では、
+   $ sudo mkdir /var/www/html/metaplugin-ci
+   $ sudo chown ciuser /var/www/html/metaplugin-ci
+   $ sudo chgrp ciuser /var/www/html/metaplugin-ci
+   としたのみ。)
+
+○ 実装メモ
+
+未稿
+
+  metaplugin-ci の内容の説明をする予定。
+
+以上

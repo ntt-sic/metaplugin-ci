@@ -1,13 +1,13 @@
 pipelines:
   - name: check
-    failure-message: Build failed. Leave a comment with 'recheck-metaplugin' to rerun a check. ('recheck' will be ignored.)
+    failure-message: Build failed. Leave a comment with 'metaplugin-recheck' to rerun a check. ('recheck' will be ignored.)
     manager: IndependentPipelineManager
     trigger:
       gerrit:
         - event: patchset-created
         - event: change-restored
         - event: comment-added
-          comment: (?i)^(Patch Set [0-9]+:)?( [\w\\+-]*)*(\n\n)?\s*recheck-metaplugin\s*$
+          comment: (?i)^(Patch Set [0-9]+:)?( [\w\\+-]*)*(\n\n)?\s*metaplugin-recheck\s*$
     success:
       gerrit:
         verified: 1

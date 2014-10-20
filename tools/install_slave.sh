@@ -27,7 +27,7 @@ if [[ ! -d $CONFIG_DIR ]]; then
 fi
 
 # NOTE: must be key content only
-JENKINS_SSH_PUBLIC_KEY_CONTENTS=`cat $DATA_PATH/$JENKINS_SSH_KEY_PATH.pub | awk '{print $2}'`
+JENKINS_SSH_PUBLIC_KEY_CONTENTS=`cat $DATA_PATH/jenkins_key.pub | awk '{print $2}'`
 
 CLASS_ARGS="ssh_key => '$JENKINS_SSH_PUBLIC_KEY_CONTENTS', "
 CLASS_ARGS="$CLASS_ARGS this_dir => '$THIS_DIR', "
