@@ -6,14 +6,14 @@
     wrappers:
       - timeout:
           timeout: 60  # Timeout in *minutes*
-          fail: true  # A job run that exceeds the timeout will cause a failure
+          fail: true   # A job run that exceeds the timeout will cause a failure
       - timestamps
 
     builders:
       - shell: |
           #!/bin/bash -x
-          ### TODO: log cleanup
           sudo rm -rf /opt/stack/logs
+          # TODO: reduce cleanup range
           sudo rm -rf /opt/stack/new
 
           sudo ovs-vsctl --if-exists del-br br-int
@@ -37,12 +37,6 @@
               cp /opt/metaplugin-ci/files/neutron_thirdparty/metaplugin $BASE/new/devstack/lib/neutron_thirdparty/
           }
           export -f pre_test_hook
-
-          #function gate_hook {
-          #    remaining_time
-          #    timeout -s 9 ${REMAINING_TIME}m /opt/devstack-gate/devstack-vm-gate.sh
-          #}
-          #export -f gate_hook
 
           cp devstack-gate/devstack-vm-gate-wrap.sh ./safe-devstack-vm-gate-wrap.sh
           ./safe-devstack-vm-gate-wrap.sh

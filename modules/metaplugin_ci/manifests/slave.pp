@@ -19,7 +19,7 @@ class metaplugin_ci::slave (
     include_pypy => false,
   }
 
-  ### TODO: fix revision to certain commit id
+  # TODO: fix revision to certain commit id
   vcsrepo { '/opt/devstack-gate':
     ensure   => present,
     provider => git,
@@ -40,14 +40,6 @@ class metaplugin_ci::slave (
     mode   => '0755',
   }
 
-###  include devstack_host
-### devstack_host duplicate slave_common. followings are copied from devsack_host
-###
-### temporary disabled
-#  package { 'mysql-server':
-#    ensure => present,
-#  }
-#
   package { 'rabbitmq-server':
     ensure  => present,
     require => File['/etc/rabbitmq/rabbitmq-env.conf'],
@@ -65,13 +57,4 @@ class metaplugin_ci::slave (
     require => File['/etc/rabbitmq'],
     source  => 'puppet:///modules/devstack_host/rabbitmq-env.conf',
   }
-
-  # TODO: We should be using existing mysql functions do this.
-#  exec { 'Set MySQL server root password':
-#    command     => 'mysqladmin -uroot password secretmysql',
-#    path        => '/bin:/usr/bin',
-#    refreshonly => true,
-#    subscribe   => Package['mysql-server'],
-#    unless      => 'mysqladmin -uroot -psecretmysql status',
-#  }
 }

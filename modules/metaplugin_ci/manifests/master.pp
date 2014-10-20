@@ -5,7 +5,6 @@
 
 class metaplugin_ci::master (
   $vhost_name = $::fqdn,
-  $manage_jenkins_jobs = true,
   $ssl_cert_file_contents = '',
   $ssl_key_file_contents = '',
   $ssl_chain_file_contents = '',
@@ -25,7 +24,6 @@ class metaplugin_ci::master (
 ) {
 
   include metaplugin_ci::base
-  ###include apache
 
   if $ssl_chain_file_contents != '' {
     $ssl_chain_file = '/etc/ssl/certs/intermediate.pem'
@@ -33,7 +31,6 @@ class metaplugin_ci::master (
     $ssl_chain_file = ''
   }
 
-  ### use original
   class { '::jenkins::master':
     vhost_name              => "jenkins",
     logo                    => 'openstack.png',
@@ -46,26 +43,12 @@ class metaplugin_ci::master (
     jenkins_ssh_private_key => $jenkins_ssh_private_key,
     jenkins_ssh_public_key  => $jenkins_ssh_public_key,
   }
-  ### os-ext-testing's ::jenkins::master only add the following
-  ### is it necesarry ?
-  #file { '/usr/local/jenkins/slave_scripts':
-  #  ensure  => directory,
-  #  owner   => 'root',
-  #  group   => 'root',
-  #  mode    => '0755',
-  #  recurse => true,
-  #  purge   => true,
-  #  force   => true,
-  #  require => File['/usr/local/jenkins'],
-  #  source  => 'puppet:///modules/jenkins/slave_scripts',
-  ###  source  => 'puppet:///modules/jenkinsx/slave_scripts',
-  #}
 
-  ### not in original
+  # NOTE: not sure these plugins are necessary.
+  #       maybe there are many unnecessary plugins.
   jenkins::plugin { 'ansicolor':
     version => '0.3.1',
   }
-  ### 1.10 -> 1.14
   jenkins::plugin { 'build-timeout':
     version => '1.14',
   }
@@ -78,40 +61,33 @@ class metaplugin_ci::master (
   jenkins::plugin { 'envinject':
     version => '1.70',
   }
-  ### 0.0.6 -> 0.0.7
   jenkins::plugin { 'gearman-plugin':
     version => '0.0.7',
   }
   jenkins::plugin { 'git':
     version => '1.1.23',
   }
-  ### not in original
   jenkins::plugin { 'github-api':
     version => '1.33',
   }
-  ### not in original
   jenkins::plugin { 'github':
     version => '1.4',
   }
   jenkins::plugin { 'greenballs':
     version => '1.12',
   }
-  ### not in original
   jenkins::plugin { 'htmlpublisher':
     version => '1.0',
   }
   jenkins::plugin { 'extended-read-permission':
     version => '1.0',
   }
-  ### in original
   jenkins::plugin { 'zmq-event-publisher':
     version => '0.0.3',
   }
-  ### not in original
   jenkins::plugin { 'postbuild-task':
     version => '1.8',
   }
-  ### not in original
   jenkins::plugin { 'violations':
     version => '0.7.11',
   }
@@ -130,18 +106,16 @@ class metaplugin_ci::master (
   jenkins::plugin { 'openid':
     version => '1.5',
   }
-  ### not in original
   jenkins::plugin { 'parameterized-trigger':
     version => '2.15',
   }
   jenkins::plugin { 'publish-over-ftp':
     version => '1.7',
   }
-  ### not in original
   jenkins::plugin { 'rebuild':
     version => '1.14',
   }
-  ### not released yet. but use 1.9 function. install manually.
+  # NOTE: not released yet. but use 1.9 function. install manually. see below.
   #jenkins::plugin { 'scp':
   #  version => '1.9',
   #}
@@ -154,11 +128,9 @@ class metaplugin_ci::master (
   jenkins::plugin { 'token-macro':
     version => '1.5.1',
   }
-  ### not in original
   jenkins::plugin { 'url-change-trigger':
     version => '1.2',
   }
-  ### not in original
   jenkins::plugin { 'urltrigger':
     version => '0.24',
   }
@@ -172,6 +144,8 @@ class metaplugin_ci::master (
     source  => 'puppet:///modules/metaplugin_ci/ssh_config',
   }
 
+  # NOTE: install scp plugin 1.9 manually.
+  #       this file is get from Ryu CI.
   file { '/var/lib/jenkins/plugins/scp.hpi':
     ensure  => present,
     owner   => 'jenkins',
@@ -181,33 +155,30 @@ class metaplugin_ci::master (
     source  => 'puppet:///modules/metaplugin_ci/scp.hpi',
   }
 
-  if $manage_jenkins_jobs == true {
-    ### use original
-    class { '::jenkins::job_builder':
-      url      => $jenkins_url,
-      username => 'jenkins',
-      password => '',
-      git_revision => 'master',
-      git_url => 'https://git.openstack.org/openstack-infra/jenkins-job-builder',
-      config_dir => 'puppet:///modules/metaplugin_ci/jenkins_job_builder/config',
-    }
+  class { '::jenkins::job_builder':
+    url      => $jenkins_url,
+    username => 'jenkins',
+    password => '',
+    git_revision => 'master',
+    git_url => 'https://git.openstack.org/openstack-infra/jenkins-job-builder',
+    config_dir => 'puppet:///modules/metaplugin_ci/jenkins_job_builder/config',
+  }
 
-    file { '/etc/jenkins_jobs/config/macros.yaml':
-      ensure => present,
-      owner  => 'root',
-      group  => 'root',
-      mode   => '0755',
-      content => template('metaplugin_ci/jenkins_job_builder/config/macros.yaml.erb'),
-      notify  => Exec['jenkins_jobs_update'],
-    }
+  file { '/etc/jenkins_jobs/config/macros.yaml':
+    ensure => present,
+    owner  => 'root',
+    group  => 'root',
+    mode   => '0755',
+    content => template('metaplugin_ci/jenkins_job_builder/config/macros.yaml.erb'),
+    notify  => Exec['jenkins_jobs_update'],
+  }
 
-    file { '/etc/default/jenkins':
-      ensure => present,
-      owner  => 'root',
-      group  => 'root',
-      mode   => '0644',
-      source => 'puppet:///modules/openstack_project/jenkins/jenkins.default',
-    }
+  file { '/etc/default/jenkins':
+    ensure => present,
+    owner  => 'root',
+    group  => 'root',
+    mode   => '0644',
+    source => 'puppet:///modules/openstack_project/jenkins/jenkins.default',
   }
 
   class { '::zuul':
@@ -229,47 +200,22 @@ class metaplugin_ci::master (
   }
   class { '::zuul::merger': }
 
+  file { '/home/zuul/.ssh':
+    ensure  => directory,
+    owner   => 'zuul',
+    group   => 'zuul',
+    mode    => '0700',
+    require => User['zuul'],
+  }
 
-##  if $upstream_gerrit_host_pub_key != '' {
-    file { '/home/zuul/.ssh':
-      ensure  => directory,
-      owner   => 'zuul',
-      group   => 'zuul',
-      mode    => '0700',
-#      require => Class['::zuul'],
-      require => User['zuul'],
-    }
-
-    ### not necessary
-    #file { '/home/zuul/.ssh/known_hosts':
-    #  ensure  => present,
-    #  owner   => 'zuul',
-    #  group   => 'zuul',
-    #  mode    => '0600',
-    #  ### TODO: check: different from zuul_dev
-    #  ###content => "[review.openstack.org]:29418,[198.101.231.251]:29418 ${upstream_gerrit_host_pub_key}",
-    #  content => "review.openstack.org,23.253.232.87,2001:4800:7815:104:3bc3:d7f6:ff03:bf5d ${upstream_gerrit_host_pub_key}",
-    #  replace => true,
-    #  require => File['/home/zuul/.ssh'],
-    #}
-
-    ### it is necessary. but why ?
-    file { '/home/zuul/.ssh/config':
-      ensure  => present,
-      owner   => 'zuul',
-      group   => 'zuul',
-      mode    => '0700',
-      require => File['/home/zuul/.ssh'],
-      source  => 'puppet:///modules/metaplugin_ci/ssh_config',
-    }
-##  }
-
-  ### used in layout.yaml
-  ### TODO: if layout.yaml is changed, it may be unnecessary.
-  file { '/etc/zuul/openstack_functions.py':
-    ensure => present,
-    source => '/etc/project-config/zuul/openstack_functions.py',
-    notify => Exec['zuul-reload'],
+  # NOTE: it is necessary. but why ?
+  file { '/home/zuul/.ssh/config':
+    ensure  => present,
+    owner   => 'zuul',
+    group   => 'zuul',
+    mode    => '0700',
+    require => File['/home/zuul/.ssh'],
+    source  => 'puppet:///modules/metaplugin_ci/ssh_config',
   }
 
   file { '/etc/zuul/logging.conf':

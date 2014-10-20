@@ -5,40 +5,36 @@
 set -ex
 
 THIS_DIR=`pwd`
-
 DATA_PATH=$THIS_DIR/data
-PUPPET_MODULE_PATH="--modulepath=$THIS_DIR/metaplugin-ci/modules:$THIS_DIR/config/modules:/etc/puppet/modules"
+METAPLUGIN_CI=$THIS_DIR/metaplugin-ci
+CONFIG_DIR=/opt/config
 
-### first step: copy THIS_DIR from master
-
-### install puppet manually
-### sudo bash config/install_puppet.sh
-### TODO: puppet
-
-### install puppet modules manually
-### sudo bash config/install_modules.sh
-### TODO: puppet
+# To be sure here is paranet dir of metaplugin_ci
+if [[ ! -d $METAPLUGIN_CI ]]; then
+    echo "Expected to exist $METAPLUGIN_CI. Please correct. Exiting."
+    exit 1
+fi
 
 # Pulling in variables from data repository
 . $DATA_PATH/vars.sh
 
-###export UPSTREAM_GERRIT_SSH_PRIVATE_KEY_CONTENTS=`cat "$DATA_PATH/$UPSTREAM_GERRIT_SSH_KEY_PATH"`
+# Install Puppet and the OpenStack Infra Config source tree
+CONFIG_REPO=${CONFIG_REPO:-https://github.com/openstack-infra/config}
+if [[ ! -d $CONFIG_DIR ]]; then
+    sudo git clone $CONFIG_REPO $CONFIG_DIR
+    sudo bash -xe $CONFIG_DIR/install_puppet.sh
+    sudo bash $CONFIG_DIR/install_modules.sh
+fi
 
-# echo "Using Jenkins SSH key path: $DATA_PATH/$JENKINS_SSH_KEY_PATH"
-###JENKINS_SSH_PRIVATE_KEY_CONTENTS=`sudo cat $DATA_PATH/$JENKINS_SSH_KEY_PATH`
-#JENKINS_SSH_PUBLIC_KEY_CONTENTS=`sudo cat $DATA_PATH/$JENKINS_SSH_KEY_PATH.pub`
-
-### must be key content only
-### TODO: get by script
-JENKINS_SSH_PUBLIC_KEY_CONTENTS='AAAAB3NzaC1yc2EAAAADAQABAAAAgQDIpnZwbQclrTLfTDt69eAq3Z1Hu/gmPlVX/WKdzMgBhHIIe8VnZKbFNv6AO6rvz6qeBP8hYwRXP+zCKDKggDhmZ+SfhtHrGXXOc76+NuoedV4taC7VN5HOA/UfZiZEwwtlaBAw+uZGj6z6yQ9ulTsK8Mh2Mne39Yk85NAqFLmW8Q=='
+# NOTE: must be key content only
+JENKINS_SSH_PUBLIC_KEY_CONTENTS=`cat $DATA_PATH/$JENKINS_SSH_KEY_PATH.pub | awk '{print $2}'`
 
 CLASS_ARGS="ssh_key => '$JENKINS_SSH_PUBLIC_KEY_CONTENTS', "
 CLASS_ARGS="$CLASS_ARGS this_dir => '$THIS_DIR', "
 
+PUPPET_MODULE_PATH="--modulepath=$METAPLUGIN_CI/modules:$CONFIG_DIR/modules:/etc/puppet/modules"
 sudo puppet apply --verbose $PUPPET_MODULE_PATH -e "class {'metaplugin_ci::slave': $CLASS_ARGS }"
 
-### tmp comment out: do later manually
-#if [[ ! -e /opt/git ]]; then
 if [[ ! -e /opt/nodepool-scripts ]]; then
     sudo cp -a /etc/project-config/nodepool/scripts /opt/nodepool-scripts
     sudo mkdir -p /opt/git
