@@ -164,10 +164,13 @@ Metaplugin CI システム構築 Howto
       puppet環境のインストール。
    c) moduleのインストール
       /opt/config/install_modules.sh の実行。
+      結構、WarningとErrorが出る。Warningは気にしない。Errorは、「already installed」
+      であれば気にしない。スクリプトは、エラーが起きても停止しない。
    d) apache用certファイル作成
       (注: 必要性がよく分かっていない)
    e) Metaplugin CI masterノード構築用manifest適用
       jenkins、zuul 関連の設定を行う。
+      Warningが少し出るが気にしない。
 
    a)～d) は初回のみ実行される。
    何か変更があるときは、metaplugin/modules/metaplugin_ci の下を修正し、manifestの再適用
@@ -275,8 +278,9 @@ Metaplugin CI システム構築 Howto
 
 2) 構築スクリプト実行
    ---
+   $ sudo apt-get install git  (<= 多分、必要)
    $ cd cubuild
-   $ sudu bash metaplugin-ci/tools/install_slave.sh
+   $ sudo bash metaplugin-ci/tools/install_slave.sh
    ...
    ---
 
@@ -298,7 +302,7 @@ Metaplugin CI システム構築 Howto
    a)～c)については、master ノードと同様。
    a)～c)、e) は初回構築時のみ実行される。
 
-   補足: e) がかなり時間かかる。
+   補足: d)は(初回は)結構時間がかかる。e) はかなり時間かかる。
 
 3) slaveの登録
   jenkinsの管理Web画面から。
@@ -307,6 +311,19 @@ Metaplugin CI システム構築 Howto
   * Node name: slaveのホスト名(/etc/hostsに書いたもの)
   * Dumb Slave にチェック。
   (Copy Existing Node にはチェックしない)
+  [OK]ボタン押下 -> 次の画面が出る。以下のように設定。
+  * Name: ホスト名
+  * Description: 空でよい
+  * # of executors: 1
+  * Remote root directory: /home/jenkins/workspaces
+  * Labels: devstack_slave
+  * Usage: Utilize this node as much as possible
+  * Launch method: Launch slave agents on Unix machines via SSH
+        Host: <slaveのip address>
+        Credentials: jenkins
+  [Save]ボタン押下(画面の下の方にある)
+
+  しばらくすると、Webのトップ画面に追加したslaveが出て、onlineになる。
 
 ○ slave 更新
 
@@ -334,8 +351,19 @@ Metaplugin CI システム構築 Howto
 
 ○ 実装メモ
 
-未稿
+まだ書いている最中。metaplugin-ci の内容の説明。
 
-  metaplugin-ci の内容の説明をする予定。
+・参考
+  metaplugin-ci は以下を参考に作成した。
+  1) Jay Pipes さんのサードパーティテストシステム構成記事とリポジトリ
+    https://github.com/jaypipes/os-ext-testing.git
+    https://github.com/jaypipes/os-ext-testing-data.git
+    http://www.joinfu.com/2014/02/setting-up-an-external-openstack-testing-system/
+    http://www.joinfu.com/2014/02/setting-up-an-openstack-external-testing-system-part-2/
+  2) Ryu のサードパーティテストシステム
+    https://github.com/osrg/ryu-neutron-zuul-ci
+  3) openstack-infra の各種リポジトリ
+    https://github.com/openstack-infra/config
+    https://github.com/openstack-infra/devstack-gate 
 
 以上
