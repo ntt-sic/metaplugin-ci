@@ -178,6 +178,8 @@ Metaplugin CI システム構築 Howto
 
 5) サービスの起動
    ---
+   $ sudo a2enmod cgid               (<= CGIを有効にする必要あり)
+   $ sudo service apache2 restart
    $ sudo service jenkins restart    (動いてるかもしれないので、restart)
    $ sudo jenkins-jobs --flush-cache update /etc/jenkins_jobs/config/
    (jenkinsの初期化がきちんと終わっていないと失敗するので、jenkins の

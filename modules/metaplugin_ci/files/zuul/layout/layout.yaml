@@ -8,14 +8,14 @@ pipelines:
         - event: change-restored
         - event: comment-added
           comment: (?i)^(Patch Set [0-9]+:)?( [\w\\+-]*)*(\n\n)?\s*metaplugin-recheck\s*$
-    success:
-      gerrit:
-        verified: 1
-    failure:
-      gerrit:
-        verified: 0
+#    success:
+#      gerrit:
+#        verified: 1
+#    failure:
+#      gerrit:
+#        verified: 0
 
 projects:
-  - name: openstack-dev/sandbox
+  - name: openstack/neutron
     check:
       - check-tempest-dsvm-metaplugin
