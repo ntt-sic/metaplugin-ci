@@ -355,7 +355,7 @@ Metaplugin CI システム構築 Howto
 
 まだ書いている最中。metaplugin-ci の内容の説明。
 
-・参考
+・参考システム
   metaplugin-ci は以下を参考に作成した。
   1) Jay Pipes さんのサードパーティテストシステム構成記事とリポジトリ
     https://github.com/jaypipes/os-ext-testing.git
@@ -367,5 +367,223 @@ Metaplugin CI システム構築 Howto
   3) openstack-infra の各種リポジトリ
     https://github.com/openstack-infra/config
     https://github.com/openstack-infra/devstack-gate 
+
+・metaplugin-ci の概要
+  puppet を使用し、jenkins の masterノードと slaveノードの構築・設定を行うもの。
+  jenkinsに関しては、JJB(jenkins job builder)を使用してjob定義を行い、zuul と連携して、
+  jobを実行するため、masterノードに関しては、JJBやzuulの構築・設定も含まれている。
+
+  job定義については、言うまでもなく、サードパーティテスティングを行うためのjobを定義する。
+  gerrit からの通知をトリガーに job を起動し、結果を返すといった一連の流れを制御するため
+  に zuul を使用している。
+  openstackインフラで実行されている、check job や gate job も同じ仕組みであり、その
+  ミニチュア版といったところである。(puppetのmanifestについても、openstack インフラのもの
+  を利用している。)
+
+  puppet および、構築対象である jenkins、JJB、zuul の知識があれば、「大したことはやって
+  いない」ことが分かる(はずである。筆者はまだよく分かっていない)。
+  何をやっているか、よく分からない場合は、それらを地道に勉強するとよい。
+
+  - puppet
+    https://docs.puppetlabs.com/puppet/
+  - JJB
+    http://ci.openstack.org/jenkins-job-builder/index.html   
+  - zuul
+    http://ci.openstack.org/zuul/index.html
+
+・参考システムとの関係
+  基本的には、Jay Pipes さんの os-ext-testing をベースにしている。os-ext-testingでは、
+  2つのpuppet module を定義している。
+  - os_ext_testing
+  - jenkins
+  os-ext-testing は、masterノードとslaveノード構築用のmanifestが定義されており、肝の
+  部分。
+  jenkinsは、jenkins関係の構築・設定用のmanifestが定義されている。openstack-infra/config
+  にも同様のものがあり、zuul に関しては、openstack-infra/config のものを使用している。
+  jenkinsについて、なぜ独自に持っているかは不明。(恐らく、現在ではその必要はなくなってい
+  ると思われる。os-ext-testingは、2014年2月頃のもので、更新されていない。)
+  metaplugin-ci では、jenkinsについても openstack-infra/config のものを使用している。
+  metaplugin-ci の puppet module は、metaplugin_ci のみで、これは、os-ext-testing の
+  os_ext_testing module に相当するものと考えて貰えればよい。
+  Jay Pipesさんは、システムによって変える部分を os-ext-testing-data に分離しているが、
+  metaplugin-ci は、Metaplugin CI 専用のものなので、分離する必然性はない。そのため、
+  os-ext-testing-data に相当する部分は、metaplugin-ci に中に取りこんである。
+
+  openstack-infra/config には、様々な puppet module が定義されている。その中で、
+  openstack_project module というものがある。これには、openstack インフラで使用される
+  マシンの設定が入っている。以下のものを参考にしている。
+  - jenkins.pp
+    jenkins masterマシン用
+  - zuul_dev.pp
+    zuulマシン用
+  - slave_common.pp
+    slaveマシン用共通部分
+  なぜか、一つのマシンに一つのサービスという構成になっており、jenkins master と zuul を
+  同居させるような構成定義がない。metaplugin_ci の master.pp は、上記の jenkins.pp と
+  zuul_dev.pp の中身を持ってきて合体させたものと(大体)考えて貰えればよい。
+  metaplugin_ci の slave.pp では、slave_common.pp をそのまま利用させてもらっている。
+
+  Ryu CI も Jay Pipes さんの os-ext-testing をベースに作られている。(metaplugin-ci の
+  先輩である)
+  Ryu CI では、openstack-infra/config と openstack-infra/devstack-gate にも手を入れており、
+  それらをまるごと自分で取り込んだ上で修正を加えている。
+  metaplugin-ci 作成時には、それら修正について、参考にさせて貰ったが、metaplugin-ci
+  としては、修正せずにそのまま使用するようにした。実際、metaplugin-ciでは、修正の必要は
+  なくて済んでいる(今のところ)。
+
+・metaplugin-ci 独自定義部分
+  metaplugin-ci として、独自の部分というのは、実は、以下の構成ファイルしかない、と言って
+  しまっても過言ではない。
+  - zuul の pipeline 定義
+    /etc/zuul/layout/layout.yaml
+  - jenkins の (JJBによる) job定義
+    /etc/jenkins-jobs/config/ の下、特に metaplugin_ci.yaml
+  以降の項で、これらの説明をする。
+
+・layout.yaml
+----------------------------------------------------------------------------------------
+pipelines:            ※1
+  - name: check       ※1
+    failure-message: Build failed. Leave a comment with 'metaplugin-recheck' to rerun a check. ('recheck' will be ignored.) ※2
+    manager: IndependentPipelineManager
+    trigger:          ※3
+      gerrit:
+        - event: patchset-created
+        - event: change-restored
+        - event: comment-added
+          comment: (?i)^(Patch Set [0-9]+:)?( [\w\\+-]*)*(\n\n)?\s*metaplugin-recheck\s*$
+    success:          ※4
+      gerrit:
+        verified: 1
+    failure:          ※4
+      gerrit:
+        verified: 0
+
+projects:             ※5
+  - name: openstack/neutron  ※6
+    check:            ※7
+      - check-tempest-dsvm-metaplugin
+--------------------------------------------------------------------------------------------
+
+  ※1 pipelineの定義。check という pipeline を定義している。
+  ※2 ビルドに失敗したときのメッセージ。gerritのコメント欄に出る。
+  ※3 トリガーを指定
+      gerrit の以下のイベントをトリガーにする。
+      - patchset が作成されたとき
+      - restoreされたとき
+      - 「metaplugin-recheck」というコメントが追加されたとき。
+  ※4 ビルドが成功したとき、失敗したときに行うことを指定
+      gerritにvote するようにしている。成功時は、+1、失敗時は、-1じゃなくて、0。
+  ※5 プロジェクトの定義。
+  ※6 対象プロジェクト。この定義では、openstack/neutron を指定。
+  ※7 checkパイプラインで実行するjobの定義。check-tempest-dsvm-metaplugi というのは、
+      jenkins のjob 定義に定義がある。
+
+  補足:
+  - commentの正規表現は、ruby の正規表現とのこと。他の例題をまねて書いたが、実際には
+    精査していない。(metaplugin-recheck というコメントで、jobが実行されるのでよしと
+    している。)
+  - 最近、recheck で始まらないのがトレンドとのことなので、recheck-metapluginではなく、
+    metaplugin-recheck としている。(recheckで始まると、Openstack infra本体のjenkins
+    が拾ってしまうためらしい。)
+
+・metaplugin_ci.yaml
+------------------------------------------------------------------------------------------
+- job:
+    name: 'check-tempest-dsvm-metaplugin'
+    description: 'Third-party testing for Neutron MetaPlugin'
+    node: 'devstack_slave'                                 ※1
+
+    wrappers:
+      - timeout:
+          timeout: 60  # Timeout in *minutes*
+          fail: true   # A job run that exceeds the timeout will cause a failure
+      - timestamps
+
+    builders:
+      - shell: |                                           ※2
+          #!/bin/bash -x
+          sudo rm -rf /opt/stack/logs                      ※3
+          # TODO: reduce cleanup range
+          sudo rm -rf /opt/stack/new                       ※4
+
+          sudo ovs-vsctl --if-exists del-br br-int         ※5
+          sudo ovs-vsctl --if-exists del-br br-ex
+          sudo ovs-vsctl --if-exists del-br br-tun
+
+          rm -rf devstack-gate                             ※6
+          ln -s /opt/devstack-gate
+      - shell: |
+          #!/bin/bash -xe
+          export LANG=C                                    ※7
+          export PYTHONUNBUFFERED=true
+          export DEVSTACK_GATE_TIMEOUT=180
+          export DEVSTACK_GATE_NEUTRON=1                   ※8
+          export DEVSTACK_GATE_TEMPEST=1                   ※8
+          export ENABLED_SERVICES=metaplugin               ※9
+          export DEVSTACK_GATE_FEATURE_MATRIX='/opt/metaplugin-ci/files/features.yaml'  ※10
+          export DEVSTACK_GATE_TEMPEST_REGEX='tempest.api.network'                      ※11
+
+          function pre_test_hook {                         ※12
+              cp /opt/metaplugin-ci/files/neutron_thirdparty/metaplugin $BASE/new/devstack/lib/neutron_thirdparty/
+          }
+          export -f pre_test_hook
+
+          cp devstack-gate/devstack-vm-gate-wrap.sh ./safe-devstack-vm-gate-wrap.sh     ※13
+          ./safe-devstack-vm-gate-wrap.sh
+      - link-logs  # In macros.yaml
+
+    publishers:
+      - devstack-logs  # In macros.yaml                     ※14
+      - console-log  # In macros.yaml                       ※14
+      - post-tasks:                                         ※15
+          - matches:                                        ※16
+              - log-text: ''
+                operator: AND
+            script: |
+              bash /opt/metaplugin-ci/files/jenkins-slave.sh offline  ※17
+              sudo /sbin/shutdown -r +1 &
+
+- project:
+    name: metaplugin-ci
+
+    jobs:
+        - check-tempest-dsvm-metaplugin:
+-------------------------------------------------------------------------------------------
+
+  ※1 この「devstack_slave」というラベルがついた slave ノードが実行ノードとして選択される。
+  ※2 前回jobの後始末を行っている。
+  ※3 jobのログは、/opt/stack/logs/ の下に集約される。ここでは、前回のログを削除している。
+      /opt/stack/logs/ は、job実行の過程で作成される。
+  ※4 devstackの実行環境が、/opt/stack/new/ の下に作成される。前回実行のゴミが残っている
+      ため削除している。ゴミだけ選択して消すことも考えられるが、面倒なので全部消している。
+      (あまり実行時間に差がないようだ。コメントは消しておく必要がある。)
+  ※5 jobの実行後は、ノードをリブートしている。ovs関連は、リブートしても消えないので、
+      消している。これらは、devstackで再度作成される。
+  ※6 jobで利用している、devstack-gate/devstack-vm-gate-wrap.sh スクリプト(等)を
+      jenkinsのworkspace上に持ってくる(実際にはシンボリックリンクだが)。jobの都合上。
+  ※7 script中で、コマンドの出力を解析しているところがある。日本語だとまずい。
+  ※8 neutron および、tempest を有効化。(これらはオプションの扱いなので)
+  ※9 metapluginを使用するため。
+  ※10 起動サービスを絞るため。起動サービスは、feature.yaml を解析して決められている。
+      devstack-gate オリジナルの feature.yaml だと、horizon 等、必要のないサービスまで
+      起動されてしまうので、独自の feature.yaml を使うようにしている。
+  ※11 tempestの実行範囲を指定。現状は、tempest.api.networkのみ実行。複数ある場合は、
+      'aaa bbb ccc' のように列挙すればよいはず。
+  ※12 metapluginを使用するための仕掛け。pre_test_hook は、devstack 実行前に実行される関数
+      で、このように外で指定することが可能。
+      ここでは、neutron_thirdparty 配下に metaplugin スクリプトを置いている。これと、※9
+      の指定により、devstack実行時に metapluginスクリプトが実行され、それにより、metaplugin
+      が使用されるようになる。
+  ※13 devstack-vm-gate-wrap.sh の処理内容については、後述。
+  ※14 ログ一式とコンソールログをSCPで、ログサーバに転送する。
+  ※15 jobの最後に行う作業を定義。devstack-vm-gate-wrap.sh では、devstackを起動してそのまま
+      なので、後始末をする必要があるが、rebootするのが一番面倒が少ないので、rebootするように
+      してある。
+  ※16 post-taskを実行する条件を記述。ここでは、常に実行されるよう指定。
+  ※17 reboot中にjobがスケジュールされないよう、こここで、明にofflineにする。
+      起動時にonlineになるようにしてある。
+
+未稿(つづく)
 
 以上
