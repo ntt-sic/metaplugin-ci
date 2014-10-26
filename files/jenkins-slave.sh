@@ -1,12 +1,12 @@
 #!/bin/bash
 
-JENKINS_URL=${JENKINS_URL:-http://master:8080/}
+JENKINS_CLI_URL=${JENKINS_CLI_URL:-http://master:8080/}
 JENKINS_NODENAME=${JENKINS_NODENAME:-$(hostname)}
 JENKINS_CLI=/opt/metaplugin-ci/files/jenkins-cli.jar
 
 jenkins_cli() {
         cmd=$1
-        sudo -u jenkins java -jar $JENKINS_CLI -s $JENKINS_URL $cmd $JENKINS_NODENAME
+        sudo -u jenkins java -jar $JENKINS_CLI -s $JENKINS_CLI_URL $cmd $JENKINS_NODENAME
 }
 
 case "$1" in
