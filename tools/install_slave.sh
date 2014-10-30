@@ -37,7 +37,10 @@ sudo puppet apply --verbose $PUPPET_MODULE_PATH -e "class {'metaplugin_ci::slave
 
 if [[ ! -e /opt/nodepool-scripts ]]; then
     sudo cp -a /etc/project-config/nodepool/scripts /opt/nodepool-scripts
-    sudo mkdir -p /opt/git
-    sudo -i python /opt/nodepool-scripts/cache_git_repos.py
-    sudo /opt/nodepool-scripts/prepare_devstack.sh
 fi
+sudo mkdir -p /opt/git
+sudo -i python /opt/nodepool-scripts/cache_git_repos.py
+sudo /opt/nodepool-scripts/prepare_devstack.sh
+
+# NOTE: workaround
+sudo echo "extra-index-url = http://tarballs.openstack.org http://pypi.openstack.org/simple" >> /home/jenkins/.pip/pip.conf

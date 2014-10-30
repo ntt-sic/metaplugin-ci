@@ -10,6 +10,7 @@
       - timestamps
 
     builders:
+      - link-logs  # In macros.yaml
       - shell: |
           #!/bin/bash -x
           sudo rm -rf /opt/stack/logs
@@ -40,7 +41,6 @@
 
           cp devstack-gate/devstack-vm-gate-wrap.sh ./safe-devstack-vm-gate-wrap.sh
           ./safe-devstack-vm-gate-wrap.sh
-      - link-logs  # In macros.yaml
 
     publishers:
       - devstack-logs  # In macros.yaml
