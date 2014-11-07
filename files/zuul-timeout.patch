@@ -1,0 +1,24 @@
+--- gerrit.py.bak	2014-11-04 03:56:27.089238000 +0000
++++ gerrit.py	2014-11-05 03:42:26.025238000 +0000
+@@ -45,7 +45,9 @@
+         poll = select.poll()
+         poll.register(stdout.channel)
+         while True:
+-            ret = poll.poll()
++            ret = poll.poll(1200000)
++            if not ret:
++                return True
+             for (fd, event) in ret:
+                 if fd == stdout.channel.fileno():
+                     if event == select.POLLIN:
+@@ -65,7 +67,9 @@
+ 
+             stdin, stdout, stderr = client.exec_command("gerrit stream-events")
+ 
+-            self._listen(stdout, stderr)
++            if self._listen(stdout, stderr):
++                client.close()
++                raise Exception("ssh connection timeout")
+ 
+             ret = stdout.channel.recv_exit_status()
+             self.log.debug("SSH exit status: %s" % ret)

@@ -5,8 +5,11 @@ pipelines:
     trigger:
       gerrit:
         - event: patchset-created
+          branch: ^master$
         - event: change-restored
+          branch: ^master$
         - event: comment-added
+          branch: ^master$
           comment: (?i)^(Patch Set [0-9]+:)?( [\w\\+-]*)*(\n\n)?\s*metaplugin-recheck\s*$
     success:
       gerrit:
