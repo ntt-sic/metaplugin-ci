@@ -33,6 +33,7 @@
           export ENABLED_SERVICES=metaplugin
           export DEVSTACK_GATE_FEATURE_MATRIX='/opt/metaplugin-ci/files/features.yaml'
           export DEVSTACK_GATE_TEMPEST_REGEX='tempest.api.network'
+          export DEVSTACK_PROJECT_FROM_GIT=python-openstackclient
 
           function pre_test_hook {
               cp /opt/metaplugin-ci/files/neutron_thirdparty/metaplugin $BASE/new/devstack/lib/neutron_thirdparty/
