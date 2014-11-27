@@ -584,6 +584,61 @@ projects:             ※5
   ※17 reboot中にjobがスケジュールされないよう、こここで、明にofflineにする。
       起動時にonlineになるようにしてある。
 
-未稿(つづく)
+未稿(続く予定)
+
+○ 注意事項、課題
+
+・jenkins SCP プラグイン
+  ログの転送に SCP プラグインを使用している。SCP プラグインの公式最新版は、1.8 であるが、
+  これは、ドキュメント( http://ci.openstack.org/jenkins-job-builder/publishers.html )
+  に書いてあるパラメータ、copy-after-failure、copy-console をサポートしていない。
+  これらは、まだ公式リリースされていない 1.9 でサポートされている。
+  これらのパラメータは、OpenStack公式のCI環境でも使用されており、開発版を使用しているもの
+  と思われる。
+  metaplugin-ci で使用しているものは、Ryu CI で使用しているものを貰ってきたものである。
+  (modules/metaplugin_ci/files/scp.hpi)
+  現状のmanifest(modules/metaplugin_ci/manifests/master.pp)では、これを
+  /var/lib/jenkins/pkugins/ に配置するようにしている。SCP プラグインの 1.9 が公式リリース
+  されたら、それを使用するように修正する。
+
+・slave用 /opt/devstack-gate
+  openstack-infra/devstack-gate 使用。slaveノード構築時から更新せずに使用している。
+  使用しているcommit id は、31ec62bf50b20f2be17214f4a02d279a5564d300
+
+  また、以下のローカル修正をしている。
+----------------------------------------------------------------------------------------
+--- a/devstack-vm-gate-wrap.sh
++++ b/devstack-vm-gate-wrap.sh
+@@ -320,7 +320,7 @@ if ! function_exists "gate_hook"; then
+     # the command we use to run the gate
+     function gate_hook {
+         remaining_time
+-        timeout -s 9 ${REMAINING_TIME}m $BASE/new/devstack-gate/devstack-vm-gate.sh
++        timeout -s 9 ${REMAINING_TIME}m /opt/devstack-gate/devstack-vm-gate.sh
+     }
+ fi
+------------------------------------------------------------------------------------------
+  (注: gate_hookをjenkins jobの中で定義し直せば、ここで修正しなくてもできる。今は、
+   そこまでしていない。)
+  課題: openstack-infra/devstack-gate の更新への追随。
+        更新ごとに対応する必要はない。ときどきは最新版をチェックする必要あり。
+
+・zuul のコネクション問題
+  zuulでは、gerritサーバにsshで入って、イベントストリームを取得している。
+  (「gerrit stream-events」コマンドを実行して、その出力を読んでいる。このコマンドは、永遠に
+   実行し続ける。)
+  イベントストリームの入力が止まってしまい、jenkins job が実行されなくなるトラブルがたまに
+  起きる。
+  これは、ネットワーク経路のどこかで、コネクションが切断されているものと推察している。
+  (zuulとしては、単に入力待ちしているだけで、zuulから送信することはない。入力(すなわち、
+   gerrit stream-eventsの出力)がなければ、何のやりとりもされない。)
+  (Ryu CI で同様の現象が発生し、そのケースでは、ルータの設定で、コネクションが切断されて
+   いたとのこと。ルータの設定を変えて対処されたとのこと。)
+　metaplugin-ci 環境では、ネットワーク環境の詳細が不明のため、zuul側で対処を行った。
+  zuul の入力待ちにタイムアウトを設け、タイムアウトしたときに、コネクションを張り直す対処を
+  入れた。
+  修正については、files/zuul-timeout.patch に格納してある。masterを構築し直した場合は、
+  修正を当て直す必要がある。
+
 
 以上
