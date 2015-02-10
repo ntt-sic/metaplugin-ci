@@ -1,6 +1,10 @@
 # Metaplugin
 # ----------
 
+METAPLUGIN_REPO=https://github.com/ntt-sic/networking-metaplugin
+METAPLUGIN_BRANCH=master
+METAPLUGIN_DIR=$DEST/networking-metaplugin
+
 METAPLUGIN_CONF_PATH=etc/neutron/plugins/metaplugin
 METAPLUGIN_CONF_FILENAME=metaplugin.ini
 METAPLUGIN_CLASS=neutron.plugins.metaplugin.meta_neutron_plugin.MetaPluginV2
@@ -52,7 +56,10 @@ function init_metaplugin {
 }
 
 function install_metaplugin {
-    :
+    # Install networking-metaplugin.
+    git clone $METAPLUGIN_REPO $METAPLUGIN_DIR
+    cd $METAPLUGIN_DIR
+    sudo python setup.py develop
 }
 
 function start_metaplugin {

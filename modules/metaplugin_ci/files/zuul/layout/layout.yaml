@@ -21,4 +21,4 @@ pipelines:
 projects:
   - name: openstack/neutron
     check:
-      - check-tempest-dsvm-metaplugin
+      - gate-metaplugin
