@@ -1,5 +1,5 @@
 - job:
-    name: 'check-tempest-dsvm-metaplugin'
+    name: 'gate-metaplugin'
     description: 'Third-party testing for Neutron MetaPlugin'
     node: 'devstack_slave'
 
@@ -40,6 +40,16 @@
           }
           export -f pre_test_hook
 
+          function post_test_hook {
+              # Do unit test
+              cd $BASE/new/networking-metaplugin
+              sudo ./run_tests.sh -V
+              sudo /usr/local/jenkins/slave_scripts/subunit2html.py subunit.log unit_test_result.html
+              sudo gzip -9 unit_test_result.html
+              sudo mv unit_test_result.html.gz $BASE/logs
+          }
+          export -f post_test_hook
+
           cp devstack-gate/devstack-vm-gate-wrap.sh ./safe-devstack-vm-gate-wrap.sh
           ./safe-devstack-vm-gate-wrap.sh
 
@@ -58,4 +68,4 @@
     name: metaplugin-ci
 
     jobs:
-        - check-tempest-dsvm-metaplugin:
+        - gate-metaplugin:
