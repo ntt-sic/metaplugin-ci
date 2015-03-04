@@ -43,7 +43,8 @@
           function post_test_hook {
               # Do unit test
               cd $BASE/new/networking-metaplugin
-              sudo ./run_tests.sh -V
+              sudo pip install -r test-requirements.txt
+              sudo ./run_tests.sh -N
               sudo /usr/local/jenkins/slave_scripts/subunit2html.py subunit.log unit_test_result.html
               sudo gzip -9 unit_test_result.html
               sudo mv unit_test_result.html.gz $BASE/logs
