@@ -42,7 +42,7 @@ function configure_metaplugin {
     iniset /$METAPLUGIN_CONF_FILE meta default_flavor ml2
     iniset /$METAPLUGIN_CONF_FILE meta default_l3_flavor
     iniset /$METAPLUGIN_CONF_FILE meta rpc_flavor ml2
-    iniset /$METAPLUGIN_CONF_FILE meta supported_extension_aliases 'provider,binding,external-net,quotas,security-group,agent,dhcp_agent_scheduler,multi-provider,allowed-address-pairs,extra_dhcp_opt'
+    iniset /$METAPLUGIN_CONF_FILE meta supported_extension_aliases 'provider,binding,external-net,quotas,security-group,agent,dhcp_agent_scheduler,multi-provider,allowed-address-pairs,extra_dhcp_opt,port-security'
 
     Q_PLUGIN_EXTRA_CONF_FILES=("${Q_PLUGIN_EXTRA_CONF_FILES[@]}" "$METAPLUGIN_CONF_FILE")
 
